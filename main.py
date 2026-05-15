@@ -1,136 +1,107 @@
-#!/usr/bin/env python
-import math
-import sys
-from os import name
-from pathlib import Path
-from subprocess import Popen
-from typing import Dict, NoReturn
+#!/usr/bin/env python3
+"""RedditVideoMakerBot - Main entry point.
 
-from prawcore import ResponseException
-
-from reddit.subreddit import get_subreddit_threads
-from utils import settings
-from utils.cleanup import cleanup
-from utils.console import print_markdown, print_step, print_substep
-from utils.ffmpeg_install import ffmpeg_install
-from utils.id import extract_id
-from utils.version import checkversion
-from video_creation.background import (
-    chop_background,
-    download_background_audio,
-    download_background_video,
-    get_background_config,
-)
-from video_creation.final_video import make_final_video
-from video_creation.screenshot_downloader import get_screenshots_of_reddit_posts
-from video_creation.voices import save_text_to_mp3
-
-__VERSION__ = "3.4.0"
-
-print(
-    """
-██████╗ ███████╗██████╗ ██████╗ ██╗████████╗    ██╗   ██╗██╗██████╗ ███████╗ ██████╗     ███╗   ███╗ █████╗ ██╗  ██╗███████╗██████╗
-██╔══██╗██╔════╝██╔══██╗██╔══██╗██║╚══██╔══╝    ██║   ██║██║██╔══██╗██╔════╝██╔═══██╗    ████╗ ████║██╔══██╗██║ ██╔╝██╔════╝██╔══██╗
-██████╔╝█████╗  ██║  ██║██║  ██║██║   ██║       ██║   ██║██║██║  ██║█████╗  ██║   ██║    ██╔████╔██║███████║█████╔╝ █████╗  ██████╔╝
-██╔══██╗██╔══╝  ██║  ██║██║  ██║██║   ██║       ╚██╗ ██╔╝██║██║  ██║██╔══╝  ██║   ██║    ██║╚██╔╝██║██╔══██║██╔═██╗ ██╔══╝  ██╔══██╗
-██║  ██║███████╗██████╔╝██████╔╝██║   ██║        ╚████╔╝ ██║██████╔╝███████╗╚██████╔╝    ██║ ╚═╝ ██║██║  ██║██║  ██╗███████╗██║  ██║
-╚═╝  ╚═╝╚══════╝╚═════╝ ╚═════╝ ╚═╝   ╚═╝         ╚═══╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+This bot automatically creates videos from Reddit posts by combining
+text-to-speech narration with background footage.
 """
-)
-print_markdown(
-    "### Thanks for using this tool! Feel free to contribute to this project on GitHub! If you have any questions, feel free to join my Discord server or submit a GitHub issue. You can find solutions to many common problems in the documentation: https://reddit-video-maker-bot.netlify.app/"
-)
-checkversion(__VERSION__)
 
-reddit_id: str
-reddit_object: Dict[str, str | list]
+import sys
+import os
+from pathlib import Path
 
-
-def main(POST_ID=None) -> None:
-    global reddit_id, reddit_object
-    reddit_object = get_subreddit_threads(POST_ID)
-    reddit_id = extract_id(reddit_object)
-    print_substep(f"Thread ID is {reddit_id}", style="bold blue")
-    length, number_of_comments = save_text_to_mp3(reddit_object)
-    length = math.ceil(length)
-    get_screenshots_of_reddit_posts(reddit_object, number_of_comments)
-    bg_config = {
-        "video": get_background_config("video"),
-        "audio": get_background_config("audio"),
-    }
-    download_background_video(bg_config["video"])
-    download_background_audio(bg_config["audio"])
-    chop_background(bg_config, length, reddit_object)
-    make_final_video(number_of_comments, length, reddit_object, bg_config)
+# Ensure we're running from the project root
+if not Path("config.toml").exists() and not Path("config.toml.template").exists():
+    print("[ERROR] Please run this script from the project root directory.")
+    sys.exit(1)
 
 
-def run_many(times) -> None:
-    for x in range(1, times + 1):
-        print_step(
-            f'on the {x}{("th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th")[x % 10]} iteration of {times}'
-        )
-        main()
-        Popen("cls" if name == "nt" else "clear", shell=True).wait()
+def check_dependencies():
+    """Check that all required dependencies are installed."""
+    required = [
+        "praw",
+        "moviepy",
+        "requests",
+        "toml",
+        "rich",
+    ]
+    missing = []
+    for package in required:
+        try:
+            __import__(package)
+        except ImportError:
+            missing.append(package)
+
+    if missing:
+        print(f"[ERROR] Missing required packages: {', '.join(missing)}")
+        print("Please run: pip install -r requirements.txt")
+        sys.exit(1)
 
 
-def shutdown() -> NoReturn:
-    if "reddit_id" in globals():
-        print_markdown("## Clearing temp files")
-        cleanup(reddit_id)
+def check_config():
+    """Verify that the config file exists and is properly configured."""
+    config_path = Path("config.toml")
+    if not config_path.exists():
+        template_path = Path("config.toml.template")
+        if template_path.exists():
+            print(
+                "[ERROR] config.toml not found. "
+                "Please copy config.toml.template to config.toml and fill in your credentials."
+            )
+        else:
+            print("[ERROR] config.toml not found. Please create a config.toml file.")
+        sys.exit(1)
 
-    print("Exiting...")
-    sys.exit()
+
+def main():
+    """Main entry point for RedditVideoMakerBot."""
+    print("Starting RedditVideoMakerBot...")
+
+    # Pre-flight checks
+    check_dependencies()
+    check_config()
+
+    # Late imports after dependency check
+    import toml
+    from rich.console import Console
+    from rich.traceback import install as install_rich_traceback
+
+    # Install rich traceback handler for better error output
+    install_rich_traceback()
+    console = Console()
+
+    # Load configuration
+    try:
+        config = toml.load("config.toml")
+    except toml.TomlDecodeError as e:
+        console.print(f"[bold red][ERROR] Failed to parse config.toml:[/bold red] {e}")
+        sys.exit(1)
+
+    console.print("[bold green]RedditVideoMakerBot[/bold green] — Starting up")
+    console.print(f"Python version: {sys.version}")
+
+    # Ensure output directories exist
+    Path("assets/temp").mkdir(parents=True, exist_ok=True)
+    Path("results").mkdir(parents=True, exist_ok=True)
+
+    # Import and run the video creation pipeline
+    try:
+        from video_creation.main import make_final_video
+        from reddit.subreddit import get_subreddit_threads
+
+        console.print("[cyan]Fetching Reddit posts...[/cyan]")
+        reddit_thread, reddit_comments = get_subreddit_threads(config)
+
+        console.print("[cyan]Creating video...[/cyan]")
+        make_final_video(reddit_thread, reddit_comments, config)
+
+        console.print("[bold green]Video created successfully![/bold green]")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted by user. Exiting...[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[bold red]An unexpected error occurred:[/bold red] {e}")
+        raise
 
 
 if __name__ == "__main__":
-    if sys.version_info.major != 3 or sys.version_info.minor not in [10, 11, 12]:
-        print(
-            "Hey! Congratulations, you've made it so far (which is pretty rare with no Python 3.10). Unfortunately, this program only works on Python 3.10. Please install Python 3.10 and try again."
-        )
-        sys.exit()
-    ffmpeg_install()
-    directory = Path().absolute()
-    config = settings.check_toml(
-        f"{directory}/utils/.config.template.toml", f"{directory}/config.toml"
-    )
-    config is False and sys.exit()
-
-    if (
-        not settings.config["settings"]["tts"]["tiktok_sessionid"]
-        or settings.config["settings"]["tts"]["tiktok_sessionid"] == ""
-    ) and config["settings"]["tts"]["voice_choice"] == "tiktok":
-        print_substep(
-            "TikTok voice requires a sessionid! Check our documentation on how to obtain one.",
-            "bold red",
-        )
-        sys.exit()
-    try:
-        if config["reddit"]["thread"]["post_id"]:
-            for index, post_id in enumerate(config["reddit"]["thread"]["post_id"].split("+")):
-                index += 1
-                print_step(
-                    f'on the {index}{("st" if index % 10 == 1 else ("nd" if index % 10 == 2 else ("rd" if index % 10 == 3 else "th")))} post of {len(config["reddit"]["thread"]["post_id"].split("+"))}'
-                )
-                main(post_id)
-                Popen("cls" if name == "nt" else "clear", shell=True).wait()
-        elif config["settings"]["times_to_run"]:
-            run_many(config["settings"]["times_to_run"])
-        else:
-            main()
-    except KeyboardInterrupt:
-        shutdown()
-    except ResponseException:
-        print_markdown("## Invalid credentials")
-        print_markdown("Please check your credentials in the config.toml file")
-        shutdown()
-    except Exception as err:
-        config["settings"]["tts"]["tiktok_sessionid"] = "REDACTED"
-        config["settings"]["tts"]["elevenlabs_api_key"] = "REDACTED"
-        config["settings"]["tts"]["openai_api_key"] = "REDACTED"
-        print_step(
-            f"Sorry, something went wrong with this version! Try again, and feel free to report this issue at GitHub or the Discord community.\n"
-            f"Version: {__VERSION__} \n"
-            f"Error: {err} \n"
-            f'Config: {config["settings"]}'
-        )
-        raise err
+    main()
