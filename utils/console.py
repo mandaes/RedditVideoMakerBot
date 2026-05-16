@@ -30,12 +30,13 @@ def print_step(step: str) -> None:
     console.print(f"[info]\u27a4 {step}[/info]")
 
 
-def print_substep(substep: str, style: str = "white") -> None:
+def print_substep(substep: str, style: str = "cyan") -> None:
     """Print a sub-step message with consistent styling.
 
     Args:
         substep: The sub-step message to display.
-        style: Optional rich style string to apply.
+        style: Optional rich style string to apply. Defaults to 'cyan' for
+               better readability against dark terminal backgrounds.
     """
     console.print(f"  [dim]\u2022[/dim] [{style}]{substep}[/{style}]")
 
