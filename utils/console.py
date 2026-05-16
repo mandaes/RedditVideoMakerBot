@@ -1,120 +1,98 @@
-import re
+"""Console utility functions for styled terminal output."""
 
-from rich.columns import Columns
 from rich.console import Console
-from rich.markdown import Markdown
-from rich.padding import Padding
-from rich.panel import Panel
-from rich.text import Text
+from rich.theme import Theme
+from rich.traceback import install
 
-console = Console()
+# Install rich traceback handler for better error display
+install()
+
+# Define custom theme for consistent styling
+custom_theme = Theme(
+    {
+        "info": "bold cyan",
+        "warning": "bold yellow",
+        "error": "bold red",
+        "success": "bold green",
+        "highlight": "bold magenta",
+    }
+)
+
+console = Console(theme=custom_theme)
 
 
-def print_markdown(text) -> None:
-    """Prints a rich info message. Support Markdown syntax."""
+def print_step(step: str) -> None:
+    """Print a step message with consistent styling.
 
-    md = Padding(Markdown(text), 2)
+    Args:
+        step: The step message to display.
+    """
+    console.print(f"[info]\u27a4 {step}[/info]")
+
+
+def print_substep(substep: str, style: str = "white") -> None:
+    """Print a sub-step message with consistent styling.
+
+    Args:
+        substep: The sub-step message to display.
+        style: Optional rich style string to apply.
+    """
+    console.print(f"  [dim]\u2022[/dim] [{style}]{substep}[/{style}]")
+
+
+def print_success(message: str) -> None:
+    """Print a success message.
+
+    Args:
+        message: The success message to display.
+    """
+    console.print(f"[success]\u2714 {message}[/success]")
+
+
+def print_warning(message: str) -> None:
+    """Print a warning message.
+
+    Args:
+        message: The warning message to display.
+    """
+    console.print(f"[warning]\u26a0 WARNING: {message}[/warning]")
+
+
+def print_error(message: str) -> None:
+    """Print an error message.
+
+    Args:
+        message: The error message to display.
+    """
+    console.print(f"[error]\u2718 ERROR: {message}[/error]")
+
+
+def print_markdown(markdown_text: str) -> None:
+    """Render and print markdown-formatted text to the console.
+
+    Args:
+        markdown_text: The markdown text to render.
+    """
+    from rich.markdown import Markdown
+
+    md = Markdown(markdown_text)
     console.print(md)
 
 
-def print_step(text) -> None:
-    """Prints a rich info message."""
+def print_table(title: str, data: dict) -> None:
+    """Print a formatted table with a title and key-value data.
 
-    panel = Panel(Text(text, justify="left"))
-    console.print(panel)
+    Args:
+        title: The title of the table.
+        data: A dictionary of key-value pairs to display.
+    """
+    from rich.table import Table
 
+    table = Table(title=title, show_header=True, header_style="bold magenta")
+    table.add_column("Setting", style="cyan", no_wrap=True)
+    table.add_column("Value", style="white")
 
-def print_table(items) -> None:
-    """Prints items in a table."""
+    for key, value in data.items():
+        table.add_row(str(key), str(value))
 
-    console.print(Columns([Panel(f"[yellow]{item}", expand=True) for item in items]))
-
-
-def print_substep(text, style="") -> None:
-    """Prints a rich colored info message without the panelling."""
-    console.print(text, style=style)
-
-
-def handle_input(
-    message: str = "",
-    check_type=False,
-    match: str = "",
-    err_message: str = "",
-    nmin=None,
-    nmax=None,
-    oob_error="",
-    extra_info="",
-    options: list = None,
-    default=NotImplemented,
-    optional=False,
-):
-    if optional:
-        console.print(message + "\n[green]This is an optional value. Do you want to skip it? (y/n)")
-        if input().casefold().startswith("y"):
-            return default if default is not NotImplemented else ""
-    if default is not NotImplemented:
-        console.print(
-            "[green]"
-            + message
-            + '\n[blue bold]The default value is "'
-            + str(default)
-            + '"\nDo you want to use it?(y/n)'
-        )
-        if input().casefold().startswith("y"):
-            return default
-    if options is None:
-        match = re.compile(match)
-        console.print("[green bold]" + extra_info, no_wrap=True)
-        while True:
-            console.print(message, end="")
-            user_input = input("").strip()
-            if check_type is not False:
-                try:
-                    user_input = check_type(user_input)
-                    if (nmin is not None and user_input < nmin) or (
-                        nmax is not None and user_input > nmax
-                    ):
-                        # FAILSTATE Input out of bounds
-                        console.print("[red]" + oob_error)
-                        continue
-                    break  # Successful type conversion and number in bounds
-                except ValueError:
-                    # Type conversion failed
-                    console.print("[red]" + err_message)
-                    continue
-            elif match != "" and re.match(match, user_input) is None:
-                console.print("[red]" + err_message + "\nAre you absolutely sure it's correct?(y/n)")
-                if input().casefold().startswith("y"):
-                    break
-                continue
-            else:
-                # FAILSTATE Input STRING out of bounds
-                if (nmin is not None and len(user_input) < nmin) or (
-                    nmax is not None and len(user_input) > nmax
-                ):
-                    console.print("[red bold]" + oob_error)
-                    continue
-                break  # SUCCESS Input STRING in bounds
-        return user_input
-    console.print(extra_info, no_wrap=True)
-    while True:
-        console.print(message, end="")
-        user_input = input("").strip()
-        if check_type is not False:
-            try:
-                isinstance(eval(user_input), check_type)  # fixme: remove eval
-                return check_type(user_input)
-            except:
-                console.print(
-                    "[red bold]"
-                    + err_message
-                    + "\nValid options are: "
-                    + ", ".join(map(str, options))
-                    + "."
-                )
-                continue
-        if user_input in options:
-            return user_input
-        console.print(
-            "[red bold]" + err_message + "\nValid options are: " + ", ".join(map(str, options)) + "."
-        )
+    console.print(table)
