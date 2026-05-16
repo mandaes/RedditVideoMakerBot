@@ -94,12 +94,11 @@ def main():
         console.print("[cyan]Creating video...[/cyan]")
         make_final_video(reddit_thread, reddit_comments, config)
 
-        console.print("[bold green]Video created successfully![/bold green]")
-        # Print the results directory path so it's easy to find the output
-        console.print(f"Output saved to: {Path('results').resolve()}")
-
+        # Print the output path so it's easy to find the finished video
+        results_dir = Path("results").resolve()
+        console.print(f"[bold green]Video created successfully![/bold green] Output saved to: {results_dir}")
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted by user. Exiting...[/yellow]")
+        console.print("[yellow]Interrupted by user.[/yellow]")
         sys.exit(0)
     except Exception as e:
         console.print(f"[bold red][ERROR] An unexpected error occurred:[/bold red] {e}")
