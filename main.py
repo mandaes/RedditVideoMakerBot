@@ -76,7 +76,7 @@ def main():
         console.print(f"[bold red][ERROR] Failed to parse config.toml:[/bold red] {e}")
         sys.exit(1)
 
-    console.print("[bold green]RedditVideoMakerBot[/bold green] — Starting up")
+    console.print("[bold green]RedditVideoMakerBot[/bold green] \u2014 Starting up")
     console.print(f"Python version: {sys.version}")
 
     # Ensure output directories exist
@@ -96,12 +96,14 @@ def main():
 
         # Print the output path so it's easy to find the finished video
         results_dir = Path("results").resolve()
-        console.print(f"[bold green]Video created successfully![/bold green] Output saved to: {results_dir}")
+        console.print(f"[bold green]Done![/bold green] Output saved to: {results_dir}")
+
     except KeyboardInterrupt:
-        console.print("[yellow]Interrupted by user.[/yellow]")
+        # Friendlier message than a raw traceback when I Ctrl+C during testing
+        console.print("\n[yellow]Interrupted by user. Exiting.[/yellow]")
         sys.exit(0)
     except Exception as e:
-        console.print(f"[bold red][ERROR] An unexpected error occurred:[/bold red] {e}")
+        console.print(f"[bold red][ERROR] Video creation failed:[/bold red] {e}")
         raise
 
 
