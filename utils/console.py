@@ -18,7 +18,8 @@ custom_theme = Theme(
     }
 )
 
-console = Console(theme=custom_theme)
+# Using stderr=False so output can be piped/redirected cleanly
+console = Console(theme=custom_theme, stderr=False)
 
 
 def print_step(step: str) -> None:
