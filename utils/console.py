@@ -19,7 +19,8 @@ custom_theme = Theme(
 )
 
 # Using stderr=False so output can be piped/redirected cleanly
-console = Console(theme=custom_theme, stderr=False)
+# width=120 prevents lines from wrapping too early on wider terminals
+console = Console(theme=custom_theme, stderr=False, width=120)
 
 
 def print_step(step: str) -> None:
