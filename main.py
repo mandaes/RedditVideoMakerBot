@@ -99,11 +99,10 @@ def main():
         console.print(f"[bold green]Done![/bold green] Output saved to: {results_dir}")
 
     except KeyboardInterrupt:
-        # Friendlier message than a raw traceback when I Ctrl+C during testing
         console.print("\n[yellow]Interrupted by user. Exiting.[/yellow]")
         sys.exit(0)
     except Exception as e:
-        console.print(f"[bold red][ERROR] Video creation failed:[/bold red] {e}")
+        console.print(f"[bold red][ERROR] An unexpected error occurred:[/bold red] {e}")
         raise
 
 
