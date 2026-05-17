@@ -59,7 +59,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "time_before_first_picture": 0.5,
             "time_before_tts": 0.5,
             "time_after_last_picture": 0.5,
-            "transition": 0,
+            # Bumped transition up from 0 - a small crossfade looks much nicer
+            "transition": 0.3,
         },
         "zoom": {
             "zoom_start_time": 0,
@@ -106,5 +107,4 @@ def load_config() -> Dict[str, Any]:
     return _config
 
 
-def get_config() -> Dict[str, Any]:
-    """Return the current configuration, loading it if ne
+def get_con
