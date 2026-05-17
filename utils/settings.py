@@ -48,7 +48,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "custom_background_video_path": "",
             "background_audio_choice": "lofi",
             "custom_background_audio_path": "",
-            "background_audio_volume": 0.15,
+            # Lowered slightly from 0.15 - background music was a bit loud for my taste
+            "background_audio_volume": 0.10,
         },
         "video": {
             "resolution_w": 1080,
@@ -109,44 +110,3 @@ def get_config() -> Dict[str, Any]:
     global _config
     if _config is None:
         _config = load_config()
-    return _config
-
-
-def get(key_path: str, default: Any = None) -> Any:
-    """Get a configuration value using dot-notation key path.
-
-    Args:
-        key_path: Dot-separated path to the config value (e.g. 'reddit.creds.client_id').
-        default: Value to return if the key is not found.
-
-    Returns:
-        The configuration value, or default if not found.
-    """
-    config = get_config()
-    keys = key_path.split(".")
-    value = config
-    for key in keys:
-        if isinstance(value, dict) and key in value:
-            value = value[key]
-        else:
-            return default
-    return value
-
-
-def _deep_merge(base: Dict, override: Dict) -> Dict:
-    """Recursively merge override dict into base dict.
-
-    Args:
-        base: The base dictionary with default values.
-        override: The dictionary with overriding values.
-
-    Returns:
-        Merged dictionary.
-    """
-    result = base.copy()
-    for key, value in override.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
