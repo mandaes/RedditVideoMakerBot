@@ -1,170 +1,152 @@
-import re
+"""Settings and configuration management for RedditVideoMakerBot.
+
+Handles loading, validating, and accessing configuration values from
+the config.toml file.
+"""
+
+import os
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Any, Dict, Optional
 
-import toml
-from rich.console import Console
+try:
+    import toml
+except ImportError:
+    import pip
+    pip.main(["install", "toml"])
+    import toml
 
-from utils.console import handle_input
+from utils.console import print_error, print_warning
 
-console = Console()
-config = dict  # autocomplete
+# Default configuration values
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "reddit": {
+        "creds": {
+            "client_id": "",
+            "client_secret": "",
+            "username": "",
+            "password": "",
+            "2fa": False,
+        },
+        "thread": {
+            "subreddit": "askreddit",
+            "post_id": "",
+            "max_comment_length": 500,
+            "min_comment_length": 1,
+            "post_lang": "en",
+            "number_of_comments": 20,
+        },
+    },
+    "settings": {
+        "tts": {
+            "voice_choice": "en_us_001",
+            "tiktok_sessionid": "",
+            "streamlabs_voice": "Brian",
+            "aws_polly_voice": "Matthew",
+        },
+        "background": {
+            "background_choice": "minecraft",
+            "custom_background_video_path": "",
+            "background_audio_choice": "lofi",
+            "custom_background_audio_path": "",
+            "background_audio_volume": 0.15,
+        },
+        "video": {
+            "resolution_w": 1080,
+            "resolution_h": 1920,
+            "opacity": 0.9,
+            "time_before_first_picture": 0.3,
+            "time_before_tts": 0.5,
+            "time_after_last_picture": 0.3,
+            "transition": 0,
+        },
+        "zoom": {
+            "zoom_start_time": 0,
+            "zoom_end_time": 0,
+            "zoom_factor": 1,
+            "zoom_type": "linear",
+        },
+        "allow_nsfw": False,
+        "theme": "dark",
+        "times_to_run": 1,
+        "output_path": "./results",
+        "storymode": False,
+        "storymodemethod": 0,
+        "storymodemax": 500,
+    },
+}
+
+_config: Optional[Dict[str, Any]] = None
+CONFIG_PATH = Path("config.toml")
 
 
-def crawl(obj: dict, func=lambda x, y: print(x, y, end="\n"), path=None):
-    if path is None:  # path Default argument value is mutable
-        path = []
-    for key in obj.keys():
-        if type(obj[key]) is dict:
-            crawl(obj[key], func, path + [key])
-            continue
-        func(path + [key], obj[key])
+def load_config() -> Dict[str, Any]:
+    """Load configuration from config.toml, merging with defaults.
 
+    Returns:
+        Dict containing the merged configuration.
 
-def check(value, checks, name):
-    def get_check_value(key, default_result):
-        return checks[key] if key in checks else default_result
+    Raises:
+        FileNotFoundError: If config.toml does not exist.
+    """
+    global _config
 
-    incorrect = False
-    if value == {}:
-        incorrect = True
-    if not incorrect and "type" in checks:
-        try:
-            value = eval(checks["type"])(value)  # fixme remove eval
-        except:
-            incorrect = True
-
-    if (
-        not incorrect and "options" in checks and value not in checks["options"]
-    ):  # FAILSTATE Value is not one of the options
-        incorrect = True
-    if (
-        not incorrect
-        and "regex" in checks
-        and (
-            (isinstance(value, str) and re.match(checks["regex"], value) is None)
-            or not isinstance(value, str)
+    if not CONFIG_PATH.exists():
+        raise FileNotFoundError(
+            f"Configuration file '{CONFIG_PATH}' not found. "
+            "Please copy config.template.toml to config.toml and fill in your credentials."
         )
-    ):  # FAILSTATE Value doesn't match regex, or has regex but is not a string.
-        incorrect = True
 
-    if (
-        not incorrect
-        and not hasattr(value, "__iter__")
-        and (
-            ("nmin" in checks and checks["nmin"] is not None and value < checks["nmin"])
-            or ("nmax" in checks and checks["nmax"] is not None and value > checks["nmax"])
-        )
-    ):
-        incorrect = True
-    if (
-        not incorrect
-        and hasattr(value, "__iter__")
-        and (
-            ("nmin" in checks and checks["nmin"] is not None and len(value) < checks["nmin"])
-            or ("nmax" in checks and checks["nmax"] is not None and len(value) > checks["nmax"])
-        )
-    ):
-        incorrect = True
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        user_config = toml.load(f)
 
-    if incorrect:
-        value = handle_input(
-            message=(
-                (("[blue]Example: " + str(checks["example"]) + "\n") if "example" in checks else "")
-                + "[red]"
-                + ("Non-optional ", "Optional ")["optional" in checks and checks["optional"] is True]
-            )
-            + "[#C0CAF5 bold]"
-            + str(name)
-            + "[#F7768E bold]=",
-            extra_info=get_check_value("explanation", ""),
-            check_type=eval(get_check_value("type", "False")),  # fixme remove eval
-            default=get_check_value("default", NotImplemented),
-            match=get_check_value("regex", ""),
-            err_message=get_check_value("input_error", "Incorrect input"),
-            nmin=get_check_value("nmin", None),
-            nmax=get_check_value("nmax", None),
-            oob_error=get_check_value(
-                "oob_error", "Input out of bounds(Value too high/low/long/short)"
-            ),
-            options=get_check_value("options", None),
-            optional=get_check_value("optional", False),
-        )
+    # Deep merge user config over defaults
+    _config = _deep_merge(DEFAULT_CONFIG, user_config)
+    return _config
+
+
+def get_config() -> Dict[str, Any]:
+    """Return the current configuration, loading it if necessary."""
+    global _config
+    if _config is None:
+        _config = load_config()
+    return _config
+
+
+def get(key_path: str, default: Any = None) -> Any:
+    """Get a configuration value using dot-notation key path.
+
+    Args:
+        key_path: Dot-separated path to the config value (e.g. 'reddit.creds.client_id').
+        default: Value to return if the key is not found.
+
+    Returns:
+        The configuration value, or default if not found.
+    """
+    config = get_config()
+    keys = key_path.split(".")
+    value = config
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return default
     return value
 
 
-def crawl_and_check(obj: dict, path: list, checks: dict = {}, name=""):
-    if len(path) == 0:
-        return check(obj, checks, name)
-    if path[0] not in obj.keys():
-        obj[path[0]] = {}
-    obj[path[0]] = crawl_and_check(obj[path[0]], path[1:], checks, path[0])
-    return obj
+def _deep_merge(base: Dict, override: Dict) -> Dict:
+    """Recursively merge override dict into base dict.
 
+    Args:
+        base: The base dictionary with default values.
+        override: The dictionary with overriding values.
 
-def check_vars(path, checks):
-    global config
-    crawl_and_check(config, path, checks)
-
-
-def check_toml(template_file, config_file) -> Tuple[bool, Dict]:
-    global config
-    config = None
-    try:
-        template = toml.load(template_file)
-    except Exception as error:
-        console.print(f"[red bold]Encountered error when trying to to load {template_file}: {error}")
-        return False
-    try:
-        config = toml.load(config_file)
-    except toml.TomlDecodeError:
-        console.print(
-            f"""[blue]Couldn't read {config_file}.
-Overwrite it?(y/n)"""
-        )
-        if not input().startswith("y"):
-            print("Unable to read config, and not allowed to overwrite it. Giving up.")
-            return False
+    Returns:
+        Merged dictionary.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
         else:
-            try:
-                with open(config_file, "w") as f:
-                    f.write("")
-            except:
-                console.print(
-                    f"[red bold]Failed to overwrite {config_file}. Giving up.\nSuggestion: check {config_file} permissions for the user."
-                )
-                return False
-    except FileNotFoundError:
-        console.print(
-            f"""[blue]Couldn't find {config_file}
-Creating it now."""
-        )
-        try:
-            with open(config_file, "x") as f:
-                f.write("")
-            config = {}
-        except:
-            console.print(
-                f"[red bold]Failed to write to {config_file}. Giving up.\nSuggestion: check the folder's permissions for the user."
-            )
-            return False
-
-    console.print(
-        """\
-[blue bold]###############################
-#                             #
-# Checking TOML configuration #
-#                             #
-###############################
-If you see any prompts, that means that you have unset/incorrectly set variables, please input the correct values.\
-"""
-    )
-    crawl(template, check_vars)
-    with open(config_file, "w") as f:
-        toml.dump(config, f)
-    return config
-
-
-if __name__ == "__main__":
-    directory = Path().absolute()
-    check_toml(f"{directory}/utils/.config.template.toml", "config.toml")
+            result[key] = value
+    return result
