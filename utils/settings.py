@@ -55,9 +55,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "resolution_w": 1080,
             "resolution_h": 1920,
             "opacity": 0.9,
-            "time_before_first_picture": 0.3,
+            # Increased slightly - the default 0.3s felt too abrupt on my machine
+            "time_before_first_picture": 0.5,
             "time_before_tts": 0.5,
-            "time_after_last_picture": 0.3,
+            "time_after_last_picture": 0.5,
             "transition": 0,
         },
         "zoom": {
@@ -106,7 +107,4 @@ def load_config() -> Dict[str, Any]:
 
 
 def get_config() -> Dict[str, Any]:
-    """Return the current configuration, loading it if necessary."""
-    global _config
-    if _config is None:
-        _config = load_config()
+    """Return the current configuration, loading it if ne
